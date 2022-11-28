@@ -1,0 +1,21 @@
+apiVersion: carto.run/v1alpha1
+kind: Workload
+metadata:
+  name: tanzu-java-web-app-gitops-test-alm
+  labels:
+    apps.tanzu.vmware.com/workload-type: alm
+    app.kubernetes.io/part-of: tanzu-java-web-app
+spec:
+  params:
+  - name: annotations
+    value:
+      autoscaling.knative.dev/minScale: "1"
+    name: pkgname
+    value: tanzu-java-web-app-gitops-test-alm
+    name: pkgversion
+    value: "1.0.0"
+  source:
+    git:
+      url: https://github.com/sample-accelerators/tanzu-java-web-app-gitops
+      ref:
+        branch: main

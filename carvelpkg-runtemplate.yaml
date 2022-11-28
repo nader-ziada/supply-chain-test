@@ -1,0 +1,23 @@
+#@ load("@ytt:data", "data")
+
+#@ if/end "carvelpkg-runtemplate" not in data.values.excluded_templates:
+---
+apiVersion: carto.run/v1alpha1
+kind: ClusterRunTemplate
+metadata:
+  name: carvelpkg-taskrun
+spec:
+  outputs:
+    data: .status.taskResults[?(@.name=="data")].value
+  template:
+    apiVersion: tekton.dev/v1beta1
+    kind: TaskRun
+    metadata:
+      generateName: $(runnable.metadata.name)$-
+      labels: $(runnable.metadata.labels)$
+    spec:
+      serviceAccountName: $(runnable.spec.inputs.serviceAccount)$
+      taskRef:
+        name: carvelpkg-build
+        kind: ClusterTask
+      params: $(runnable.spec.inputs.params)$

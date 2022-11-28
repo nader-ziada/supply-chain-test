@@ -1,0 +1,33 @@
+#@ load("@ytt:data", "data")
+---
+apiVersion: carto.run/v1alpha1
+kind: ClusterConfigTemplate
+metadata:
+  name: carvelpkg-config
+spec:
+  configPath: .status.outputs.data
+  template:
+    apiVersion: carto.run/v1alpha1
+    kind: Runnable
+    metadata:
+      name: $(workload.metadata.name)$-carvelpkg-config
+    spec:
+      serviceAccountName: #@ data.values.service_account_name
+      runTemplateRef:
+        name: carvelpkg-taskrun
+      inputs:
+        serviceAccount: default
+        taskRef:
+          kind: ClusterTask
+          name: carvelpkg-build
+        params:
+          - name: workload_name
+            value: $(workload.metadata.name)$
+          - name: image
+            value: $(images.image.image)$
+          - name: registry_url
+            value: #@ data.values.registry.server
+          - name: registry_username
+            value: #@ data.values.registry.username
+          - name: registry_password
+            value: #@ data.values.registry.password

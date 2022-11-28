@@ -1,0 +1,115 @@
+#@ load("@ytt:data", "data")
+
+#@ if/end "kaniko-build" not in data.values.excluded_templates:
+---
+apiVersion: tekton.dev/v1beta1
+kind: ClusterTask
+metadata:
+  name: carvelpkg-build
+spec:
+  description: |-
+    A task that builds an a carvel package
+  params:
+    - name: workload_name
+      description: The name of the package
+      type: string
+    - name: image
+      description: The path to the image
+      type: string
+    - name: registry_url
+      description: Registry url
+      type: string
+    - name: registry_username
+      description: registry username
+      type: string
+    - name: registry_password
+      description: Registry password
+      type: string
+  results:
+    - name: data
+      description: package yaml
+  steps:
+    - name: build-package
+      image: gcr.io/nziada-tkg-dev/supplychain/scriptingbase:latest
+      securityContext:
+        runAsUser: 0
+      script: |
+        #!/usr/bin/env bash
+
+        set -o errexit
+        set -o xtrace
+
+        echo "starting..."
+        MY_BUNDLE_DIR=/tmp/my-bundle
+        mkdir -p "${MY_BUNDLE_DIR}/.imgpkg"
+        mkdir -p "${MY_BUNDLE_DIR}/config"
+
+        # build config.yaml, contains the Knative Service with an image reference to $(image)
+        cat << EOF > "${MY_BUNDLE_DIR}/config/service.yaml"
+        ---
+        apiVersion: serving.knative.dev/v1
+        kind: Service
+        metadata:
+          name: $(params.workload_name)
+        spec:
+          template:
+            spec:
+              serviceAccountName: cartographer-example-registry-creds-sa
+              containers:
+                - name: workload
+                  image: $(params.image)
+                  securityContext:
+                    runAsUser: 1000
+        EOF
+        # kbld .imgpkg/images.yml from config.yaml
+        kbld -f "${MY_BUNDLE_DIR}/config" --imgpkg-lock-output "${MY_BUNDLE_DIR}/.imgpkg/images.yml"
+
+        BUNDLE="gcr.io/nziada-tkg-dev/tap-images/workloads/bundle"
+
+        # imgpkg bundle the whole thing
+        imgpkg push -b "${BUNDLE}" -f "${MY_BUNDLE_DIR}"
+        # generate a version for the package
+        package_id="$(date +%Y%m%d.%H%M.%S)"
+        # build package.yaml
+        cat >  packagefile.yaml << EOF
+        #@ load("@ytt:data", "data")
+        #@ load("@ytt:yaml", "yaml")
+
+        #@ def package_yaml():
+        apiVersion: data.packaging.carvel.dev/v1alpha1
+        kind: Package
+        metadata:
+          name: $(params.workload_name).${package_id}
+        spec:
+          refName: $(params.workload_name)
+          version: ${package_id}
+          releaseNotes: |
+                Initial release of the simple app package
+          template:
+            spec:
+              fetch:
+              - imgpkgBundle:
+                  image: ${BUNDLE}
+              template:
+              - ytt:
+                  paths:
+                  - "config/"
+              - kbld:
+                  paths:
+                  - ".imgpkg/images.yml"
+                  - "-"
+              deploy:
+              - kapp: {}
+        #@ end
+
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: $(params.workload_name)-alm
+        data:
+          delivery.yml: #@ yaml.encode(package_yaml())
+        EOF
+
+        ytt -f packagefile.yaml
+
+        ytt -f packagefile.yaml >  $(results.data.path)
