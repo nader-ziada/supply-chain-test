@@ -49,6 +49,7 @@ spec:
     templateRef:
       kind: ClusterSourceTemplate
       name: source-template
+
   - name: image-provider
     params:
     - name: serviceAccount
@@ -83,9 +84,25 @@ spec:
             - key: spec.params[?(@.name=="dockerfile")]
               operator: Exists
 
-  - name: config-provider-alm
+  - name: carvelpkg-provider
+    params:
+    - name: serviceAccount
+      value: default
+    - name: registry
+      value:
+        ca_cert_data: ""
+        repository: nziada-tkg-dev/tap-images/workloads
+        server: gcr.io
     images:
     - resource: image-provider
+      name: image
+    templateRef:
+      kind: ClusterImageTemplate
+      name: carvelpkg-provider
+
+  - name: config-provider-alm
+    images:
+    - resource: carvelpkg-provider
       name: image
     params:
     - name: serviceAccount
@@ -97,7 +114,7 @@ spec:
         server: gcr.io
     templateRef:
       kind: ClusterConfigTemplate
-      name: carvelpkg-config
+      name: config-template-alm
 
   - name: config-writer
     templateRef:
@@ -114,8 +131,6 @@ spec:
     configs:
       - resource: config-provider-alm
         name: config
-
-
 
   selectorMatchExpressions:
   - key: apps.tanzu.vmware.com/workload-type

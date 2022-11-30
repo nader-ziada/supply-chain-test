@@ -16,18 +16,17 @@ spec:
     - name: image
       description: The path to the image
       type: string
-    - name: registry_url
-      description: Registry url
+    - name: ca_cert_data
       type: string
-    - name: registry_username
-      description: registry username
-      type: string
-    - name: registry_password
-      description: Registry password
-      type: string
+      default: ""
+      description: >
+        PEM encoded certificate data for the image registry where the image
+        will be pushed to.
   results:
-    - name: data
-      description: package yaml
+    - description: Digest of the image just built.
+      name: image_digest
+    - description: Ref of the image just built.
+      name: image_ref
   steps:
     - name: build-package
       image: gcr.io/nziada-tkg-dev/supplychain/scriptingbase:latest
@@ -68,48 +67,6 @@ spec:
 
         # imgpkg bundle the whole thing
         imgpkg push -b "${BUNDLE}" -f "${MY_BUNDLE_DIR}"
-        # generate a version for the package
-        package_id="$(date +%Y%m%d.%H%M.%S)"
-        # build package.yaml
-        cat >  packagefile.yaml << EOF
-        #@ load("@ytt:data", "data")
-        #@ load("@ytt:yaml", "yaml")
 
-        #@ def package_yaml():
-        apiVersion: data.packaging.carvel.dev/v1alpha1
-        kind: Package
-        metadata:
-          name: $(params.workload_name).${package_id}
-        spec:
-          refName: $(params.workload_name)
-          version: ${package_id}
-          releaseNotes: |
-                Initial release of the simple app package
-          template:
-            spec:
-              fetch:
-              - imgpkgBundle:
-                  image: ${BUNDLE}
-              template:
-              - ytt:
-                  paths:
-                  - "config/"
-              - kbld:
-                  paths:
-                  - ".imgpkg/images.yml"
-                  - "-"
-              deploy:
-              - kapp: {}
-        #@ end
+        echo -n "${BUNDLE}" | tee "$(results.image_ref.path)"
 
-        apiVersion: v1
-        kind: ConfigMap
-        metadata:
-          name: $(params.workload_name)-alm
-        data:
-          delivery.yml: #@ yaml.encode(package_yaml())
-        EOF
-
-        ytt -f packagefile.yaml
-
-        ytt -f packagefile.yaml >  $(results.data.path)

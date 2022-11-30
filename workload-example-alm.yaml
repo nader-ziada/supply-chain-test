@@ -10,12 +10,8 @@ spec:
   - name: annotations
     value:
       autoscaling.knative.dev/minScale: "1"
-    name: pkgname
-    value: tanzu-java-web-app-gitops-test-alm
-    name: pkgversion
-    value: "1.0.0"
   source:
     git:
-      url: https://github.com/sample-accelerators/tanzu-java-web-app-gitops
+      url: https://github.com/sample-accelerators/tanzu-java-web-app
       ref:
         branch: main
