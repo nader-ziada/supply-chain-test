@@ -20,3 +20,9 @@
  ```
 
  - the service account used has registery-credentials secret that gives it access to the container registery for pushing images
+
+- The image used for the tekton task is the modified scripting base generated fron tge Dockerfile in this repo
+
+#### Outstanding:
+
+ - passing the package version and other paramaters from tge workload resource to the generated package 
